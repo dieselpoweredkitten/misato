@@ -1,9 +1,20 @@
 import os
 from io import BytesIO
 from unittest import TestCase
-from misato.utils import get_filepath
+from misato.utils import get_filepath, gen_filename
 from misato.settings import UPLOAD_PATH
 from misato.modules import FileManager, Office
+
+
+class UtilsTest(TestCase):
+
+  def test_gen_filename(self):
+    result = gen_filename()
+    self.assertEqual(len(result.split('-')), 5)
+
+  def test_get_filepath(self):
+    result = get_filepath('kittens', UPLOAD_PATH)
+    self.assertEqual(os.path.join(UPLOAD_PATH, 'kittens'), result)
 
 
 class FileManagerTest(TestCase):
