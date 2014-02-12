@@ -1,13 +1,6 @@
-from kyoto.helpers import Router, Server
+from kyoto.server import BertRPCServer
 from misato.modules import FileManager, Office
 
 
-class RPC(Router):
-
-  modules = [
-    FileManager,
-    Office,
-  ]
-
-server = Server(RPC)
-server.start()
+server = BertRPCServer([FileManager, Office])
+server.serve_forever()
