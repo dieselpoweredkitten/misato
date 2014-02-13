@@ -10,7 +10,7 @@ For misato-server, you'll need install following libraries and packages:
 
 * `libreoffice` and `python-uno` from your distro repos
 * `PyODConverter` from PyPI (install it with pip)
-* `kyoto` from (https://github.com/kyoto-project/kyoto)[github]
+* `kyoto` from [github](https://github.com/kyoto-project/kyoto)
 
 After it, pull this repo, move to misato folder and type into terminal:
 
@@ -27,7 +27,7 @@ Usage
 =======
 
 ```python
-from kyoto.helpers import Client
+from kyoto.client import Client
 
 listener = ('example.com', 8060) # misato-server address
 server = Client(listener)
