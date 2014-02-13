@@ -1,6 +1,6 @@
 import os
 
-from kyoto.helpers import Module
+from kyoto import Module
 from PyODConverter import DocumentConverter
 
 from misato.settings import (
@@ -15,22 +15,25 @@ from misato.utils import gen_filename, get_filepath
 
 class Office(Module):
 
-  def convert(self, filename):
+  def convert(self, filename, fmt='html'):
     input_path = os.path.join(UPLOAD_PATH, filename)
     if os.path.exists(input_path):
       office = DocumentConverter(OFFICE_LISTENER)
-      output_path = os.path.join(get_filepath(filename, OUTPUT_PATH), 'index.html')
+      if fmt == 'html':
+        output_path = os.path.join(get_filepath(filename, OUTPUT_PATH), 'index.html')
+      else:
+        raise ValueError('Invalid output format: {}'.format(fmt))
       result = office.convert(input_path, output_path)
       return True
     else:
-      raise Exception('File doesnt exists')
+      raise ValueError('File doesnt exists')
 
   def url_for(self, filename):
     path = os.path.join(OUTPUT_PATH, filename, 'index.html')
     if os.path.exists(path):
       return os.path.join(MEDIA_URL, filename, 'index.html')
     else:
-      raise Exception('File doesnt exists')
+      raise ValueError('File doesnt exists')
 
 
 class FileManager(Module):
@@ -45,7 +48,7 @@ class FileManager(Module):
       yield None
       yield fileobj
     else:
-      raise Exception('File doesnt exist')
+      raise ValueError('File doesnt exist')
 
   def create(self, stream):
     """
@@ -54,7 +57,8 @@ class FileManager(Module):
     filename = gen_filename()
     path = get_filepath(filename)
     with open(path, 'wb') as output:
-      output.write(stream.read())
+      for chunk in stream:
+        output.write(chunk)
     return filename
 
   def delete(self, filename):
@@ -65,7 +69,7 @@ class FileManager(Module):
     if os.path.exists(path):
       os.remove(path)
     else:
-      raise Exception('File doesnt exist')
+      raise ValueError('File doesnt exist')
     return True
 
   def list(self):
