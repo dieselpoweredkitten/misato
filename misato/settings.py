@@ -1,6 +1,7 @@
-OFFICE_LISTENER = ('localhost', 2002)
+LIBREOFFICE_PATH = "/usr/lib/libreoffice/program"
+ALLOWED_MIMETYPES = (
+    "application/pdf",
+    "application/vnd.oasis.opendocument.text",
+)
 
-UPLOAD_PATH = '/tmp/documents/'
-OUTPUT_PATH = '/tmp/html/'
-MEDIA_URL = 'docs.example.com'
-# http://docs.example.com/{uuid}/ => file:///tmp/docs/output/{uuid}/
+IMAGE_PREVIEWS_DPI = 180

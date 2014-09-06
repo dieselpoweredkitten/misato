@@ -1,5 +1,4 @@
-argparse==1.2.1
-beretta==0.1
 kyoto==0.1
-pulsar==0.7.2
-wsgiref==0.1.2
+pylokit==0.8.0
+python-libmagic==0.3.0
+Wand==0.3.8
