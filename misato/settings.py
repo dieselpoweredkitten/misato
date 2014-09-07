@@ -1,7 +1,7 @@
 LIBREOFFICE_PATH = "/usr/lib/libreoffice/program"
 ALLOWED_MIMETYPES = (
     "application/pdf",
-    "application/vnd.oasis.opendocument.text",
+    "application/msword", # Microsoft Word 2003
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document", # Microsoft Word 2007
+    "application/vnd.oasis.opendocument.text", # LibreOffice ODT
 )
-
-IMAGE_PREVIEWS_DPI = 180
