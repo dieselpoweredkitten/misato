@@ -57,11 +57,21 @@ def create_archive(pdf, previews):
 
 @kyoto.private
 def delete_tempfiles(files):
-    list(map(os.remove, files))
+    try:
+        for f in files:
+            if f:
+                os.remove(f)
+    except Exception as exception:
+        pass
 
 @kyoto.private
 def delete_tempdirs(dirs):
-    list(map(shutil.rmtree, dirs))
+    try:
+        for d in dirs:
+            if d:
+                shutil.rmtree(d)
+    except Exception as exception:
+        pass
 
 @kyoto.private
 def receive_stream(signature, stream):
@@ -89,6 +99,7 @@ def convert(stream=None):
         if not mimetype in kyoto.conf.settings.ALLOWED_MIMETYPES:
             raise ValueError("Invalid document mimetype: {0}".format(mimetype))
         else:
+            original = pdf = archive = previews = None
             try:
                 original = receive_stream(signature, stream)
                 if mimetype != "application/pdf":
