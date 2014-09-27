@@ -1,11 +1,15 @@
-import os
-import shutil
-
-import os.path
-import tempfile
-
 import magic
 import tarfile
+import hashlib
+
+import os
+import os.path
+
+import shutil
+import tempfile
+
+import logging
+import contextlib
 
 import kyoto
 import kyoto.conf
@@ -15,17 +19,22 @@ import wand.image
 
 
 @kyoto.private
-def convert_to_pdf(path):
+@contextlib.contextmanager
+def convert_to_pdf(path, mimetype):
     """
     Converts given document to PDF
     """
-    (fd, output) = tempfile.mkstemp(suffix=".pdf")
-    with pylokit.Office(kyoto.conf.settings.LIBREOFFICE_PATH) as office:
-        with office.documentLoad(path) as document:
-            document.saveAs(output, fmt="pdf")
-    return output
+    with tempfile.NamedTemporaryFile(mode="wb") as output:
+        if mimetype == "application/pdf": # just copy
+            shutil.copy(path, output)
+        else:
+            with pylokit.Office(kyoto.conf.settings.LIBREOFFICE_PATH) as office:
+                with office.documentLoad(path) as document:
+                    document.saveAs(output.name, fmt="pdf")
+        yield output.name
 
 @kyoto.private
+@contextlib.contextmanager
 def convert_to_png(path):
     """
     Converts given document to bunch of PNG images
@@ -35,52 +44,54 @@ def convert_to_png(path):
         directory = tempfile.mkdtemp()
         filename = os.path.join(directory, "%d.png")
         document.save(filename=filename)
-    return directory
+        yield directory
+    shutil.rmtree(directory)
 
 @kyoto.private
-def create_metadata(previews):
+@contextlib.contextmanager
+def extract_text_data(path, mimetype):
     """
-    Returns dictionary that contains additional info about converted document, e.g. pages count
+    Tries to extract text from document
     """
-    previews = os.listdir(previews)
-    return {
-        "pages_count": len(previews)
-    }
+    if mimetype == "application/pdf":
+        raise NotImplementedError
+    else:
+        with tempfile.NamedTemporaryFile(mode="wb") as output:
+            with pylokit.Office(kyoto.conf.settings.LIBREOFFICE_PATH) as office:
+                with office.documentLoad(path) as document:
+                    document.saveAs(output.name, fmt="txt")
+            yield output.name
 
 @kyoto.private
-def create_archive(pdf, previews):
-    (_, filename) = tempfile.mkstemp(prefix="archive_")
-    with tarfile.open(filename, "w:gz") as archive:
-        archive.add(pdf, arcname="document.pdf")
-        archive.add(previews, arcname="previews/")
-    return filename
+@contextlib.contextmanager
+def create_archive(doc, pdf, txt, imgs):
+    with tempfile.NamedTemporaryFile(mode="wb") as tfile:
+        with tarfile.open(tfile.name, "w:gz") as archive:
+            archive.add(doc, arcname="document.bin")
+            archive.add(pdf, arcname="document.pdf")
+            archive.add(txt, arcname="document.txt")
+            archive.add(imgs, arcname="pages/")
+        yield tfile.name
 
 @kyoto.private
-def delete_tempfiles(files):
-    try:
-        for f in files:
-            if f:
-                os.remove(f)
-    except Exception as exception:
-        pass
+def create_checksum(archive):
+    h = hashlib.new("sha1")
+    with open(archive, "rb") as archive:
+        while archive:
+            chunk = archive.read(kyoto.conf.settings.READ_CHUNK_SIZE)
+            if not chunk:
+                break
+            h.update(chunk)
+    return h.hexdigest()
 
 @kyoto.private
-def delete_tempdirs(dirs):
-    try:
-        for d in dirs:
-            if d:
-                shutil.rmtree(d)
-    except Exception as exception:
-        pass
-
-@kyoto.private
-def receive_stream(signature, stream):
-    (_, filename) = tempfile.mkstemp(prefix="original_")
-    with open(filename, "wb") as document:
-        document.write(signature)
+@contextlib.contextmanager
+def receive_document(stream):
+    with tempfile.NamedTemporaryFile(mode="wb") as document:
         for chunk in stream:
             document.write(chunk)
-    return filename
+            document.flush()
+        yield document.name
 
 @kyoto.private
 def return_stream(path):
@@ -91,29 +102,30 @@ def return_stream(path):
                 break
             yield chunk
 
+@kyoto.private
+@contextlib.contextmanager
+def process_document(doc, mimetype):
+    """
+    doc -> pdf + txt -> png -> archive
+    """
+    with convert_to_pdf(doc, mimetype) as pdf:
+        with extract_text_data(doc, mimetype) as txt:
+            with convert_to_png(pdf) as img:
+                with create_archive(doc, pdf, txt, img) as arc:
+                    yield arc
+
 @kyoto.blocking
-def convert(stream=None):
-    signature = next(stream)
-    with magic.Magic(mimetype=True) as m:
-        mimetype = m.from_buffer(signature)
-        if not mimetype in kyoto.conf.settings.ALLOWED_MIMETYPES:
-            raise ValueError("Invalid document mimetype: {0}".format(mimetype))
-        else:
-            original = pdf = archive = previews = None
-            try:
-                original = receive_stream(signature, stream)
-                if mimetype != "application/pdf":
-                    pdf = convert_to_pdf(original)
-                else:
-                    pdf = original
-                previews = convert_to_png(pdf)
-                metadata = create_metadata(previews)
-                archive = create_archive(pdf, previews)
-            except Exception as exception:
-                raise
-            else:
+def process(checksum, stream=None):
+    with receive_document(stream) as document:
+        with magic.Magic(mimetype=True) as m:
+            mimetype = m.from_file(document)
+        if mimetype in kyoto.conf.settings.ALLOWED_MIMETYPES:
+            with process_document(document, mimetype) as archive:
+                metadata = {
+                    "mimetype": mimetype,
+                    "checksum": create_checksum(archive)
+                }
                 yield metadata
                 yield from return_stream(archive)
-            finally:
-                delete_tempfiles([original, pdf, archive])
-                delete_tempdirs([previews])
+        else:
+            raise NotImplementedError
