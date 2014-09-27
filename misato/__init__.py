@@ -2,10 +2,8 @@ import magic
 import tarfile
 import hashlib
 
-import os
-import os.path
-
 import shutil
+import os.path
 import tempfile
 
 import logging
